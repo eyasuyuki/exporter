@@ -23,7 +23,12 @@ WHERE
 `
 
 const SELECT_ALL = `
-SELECT * FROM {{.TableName}}
+SELECT
+    *
+FROM
+    pg_attribute
+WHERE
+    attrelid = '{{.TableName}}'::regclass;
 `
 var TMPL *template.Template
 
@@ -83,8 +88,8 @@ func main() {
 			log.Fatalf("error: %v", err);
 		}
 		fmt.Printf("columns=%d", len(columns))
-		for c := range columns {
-			fmt.Printf("c = %V", c)
+		for _, c := range columns {
+			fmt.Printf("c = %v\n", c)
 		}
 	}
 
