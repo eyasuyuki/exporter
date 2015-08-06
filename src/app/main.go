@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"conf"
 	"log"
+	"os"
 )
 
 var c *conf.Conf
@@ -85,4 +86,5 @@ func main() {
 		}
 	}
 
+	os.Exit(0)
 }
