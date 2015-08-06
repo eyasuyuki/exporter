@@ -3,8 +3,6 @@ package main
 import (
 	_ "github.com/lib/pq"
 	"database/sql"
-	"text/template"
-	"bytes"
 	"fmt"
 	"conf"
 	"log"
@@ -22,16 +20,19 @@ WHERE
 	AND table_type='BASE TABLE'
 `
 
-const SELECT_ALL = `
+const SELECT_TABLE_META = `
 SELECT
-    *
+    attname,typname
 FROM
     pg_attribute
+    ,pg_type
 WHERE
-    attrelid = '{{.TableName}}'::regclass;
+    attrelid = $1::regclass
+    AND pg_attribute.attnum > 0
+    AND pg_attribute.atttypid=pg_type.oid
+ORDER BY
+	attnum ASC
 `
-var TMPL *template.Template
-
 type ColumnMeta struct {
 	ColumnName string `json:"column_name"`
 	ColumnType string `json:"column_type"`
@@ -42,15 +43,8 @@ type TableMeta struct {
 	Columns []ColumnMeta
 }
 
-func (t *TableMeta)MakeQuery() (string, error) {
-	var query bytes.Buffer
-	err := TMPL.Execute(&query, t)
-	return query.String(), err
-}
-
 func init() {
 	c = conf.NewConf("./conf.json")
-	TMPL = template.Must(template.New("query").Parse(SELECT_ALL))
 }
 
 func main() {
@@ -73,23 +67,21 @@ func main() {
 	for rows.Next() {
 		var table_name string
 		rows.Scan(&table_name)
-		fmt.Println(table_name)
-		meta := new(TableMeta)
-		meta.TableName = table_name
-		query, _ := meta.MakeQuery()
-		fmt.Print(query)
-		res, err := conn.Query(query)
+		fmt.Printf("table=%v\n", table_name)
+		stmt, err := conn.Prepare(SELECT_TABLE_META)
 		if err != nil {
 			log.Fatalf("error: %v", err);
 		}
-		defer res.Close()
-		columns, err := res.Columns()
+		defer stmt.Close()
+		row, err := stmt.Query(table_name)
 		if err != nil {
 			log.Fatalf("error: %v", err);
 		}
-		fmt.Printf("columns=%d", len(columns))
-		for _, c := range columns {
-			fmt.Printf("c = %v\n", c)
+		var n string
+		var t string
+		for row.Next() {
+			row.Scan(&n, &t)
+			fmt.Printf("column=%v, type=%v\n", n, t)
 		}
 	}
 
