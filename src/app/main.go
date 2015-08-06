@@ -48,7 +48,7 @@ func init() {
 	c = conf.NewConf("./conf.json")
 }
 
-func main() {
+func doExport() {
 	fmt.Printf("%v:%v, %v\n", c.Host, c.Port, c.Database)
 
 	var spec = "user=postgres host="+c.Host+" port="+c.Port+" dbname="+c.Database+" sslmode=disable"
@@ -85,6 +85,9 @@ func main() {
 			fmt.Printf("column=%v, type=%v\n", n, t)
 		}
 	}
+}
 
+func main() {
+	doExport()
 	os.Exit(0)
 }
