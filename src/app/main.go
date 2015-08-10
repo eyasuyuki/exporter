@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"conf"
+	"meta"
 	"log"
 	"os"
 )
@@ -37,16 +38,19 @@ WHERE
 ORDER BY
 	attnum ASC
 `
-type ColumnMeta struct {
-	Name string `json:"name"`
-	Type string `json:"type"`
-	Mode string `json:"mode"`
-}
 
-type TableMeta struct {
-	TableName string `json:"table_name"`
-	Columns []ColumnMeta
-}
+const SELECT_PRIMARY_KEY = `
+SELECT
+	pg_attribute.attname
+FROM
+	pg_index
+JOIN
+	pg_attribute ON pg_attribute.attrelid = pg_index.indrelid
+    AND pg_attribute.attnum = ANY(pg_index.indkey)
+WHERE
+	pg_index.indrelid = $1::regclass
+	AND pg_index.indisprimary;
+`
 
 func init() {
 	c = conf.NewConf("./conf.json")
@@ -77,7 +81,7 @@ func doExport() {
 		var table_name string
 		rows.Scan(&table_name)
 		fmt.Printf("table=%v\n", table_name)
-		var tbl TableMeta
+		var tbl meta.TableMeta
 		tbl.TableName = table_name
 		stmt, err := conn.Prepare(SELECT_TABLE_META)
 		if err != nil {
@@ -94,7 +98,7 @@ func doExport() {
 		for row.Next() {
 			row.Scan(&n, &t, &m)
 			fmt.Printf("column=%v, type=%v, mode=%v\n", n, t, mode_dic[m])
-			var cm ColumnMeta
+			var cm meta.ColumnMeta
 			cm.Name = n
 			cm.Type = t
 			cm.Mode = mode_dic[m]
