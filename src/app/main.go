@@ -10,6 +10,7 @@ import (
 )
 
 var c *conf.Conf
+var mode_dic map[string]string
 
 const SELECT_TABLE_NAMES = `
 SELECT
@@ -23,7 +24,9 @@ WHERE
 
 const SELECT_TABLE_META = `
 SELECT
-    attname,typname
+    attname
+    ,typname
+    ,attnotnull
 FROM
     pg_attribute
     ,pg_type
@@ -35,8 +38,9 @@ ORDER BY
 	attnum ASC
 `
 type ColumnMeta struct {
-	ColumnName string `json:"column_name"`
-	ColumnType string `json:"column_type"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+	Mode string `json:"mode"`
 }
 
 type TableMeta struct {
@@ -46,6 +50,9 @@ type TableMeta struct {
 
 func init() {
 	c = conf.NewConf("./conf.json")
+	mode_dic = make(map[string]string)
+	mode_dic["false"] = "NULLABLE"
+	mode_dic["true"] = "REQUIRED"
 }
 
 func doExport() {
@@ -65,10 +72,13 @@ func doExport() {
 		log.Fatalf("error: %v", err)
 	}
 	defer rows.Close()
+	var tables []TableMeta
 	for rows.Next() {
 		var table_name string
 		rows.Scan(&table_name)
 		fmt.Printf("table=%v\n", table_name)
+		var tbl TableMeta
+		tbl.TableName = table_name
 		stmt, err := conn.Prepare(SELECT_TABLE_META)
 		if err != nil {
 			log.Fatalf("error: %v", err);
@@ -80,10 +90,16 @@ func doExport() {
 		}
 		var n string
 		var t string
+		var m string
 		for row.Next() {
-			row.Scan(&n, &t)
-			fmt.Printf("column=%v, type=%v\n", n, t)
+			row.Scan(&n, &t, &m)
+			fmt.Printf("column=%v, type=%v, mode=%v\n", n, t, mode_dic[m])
+			var cm ColumnMeta
+			cm.Name = n
+			cm.Type = t
+			cm.Mode = mode_dic[m]
 		}
+		tables = append(tables, tbl)
 	}
 }
 
