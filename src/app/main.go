@@ -102,6 +102,8 @@ func doExport() {
 		if err != nil {
 			log.Fatalf("error: %v", err);
 		}
+		defer row.Close()
+
 		var pk string
 		for row.Next() {
 			row.Scan(&pk)
@@ -112,6 +114,8 @@ func doExport() {
 		if err != nil {
 			log.Fatalf("error: %v", err);
 		}
+		defer rw2.Close()
+
 		var n string
 		var t string
 		var m string
