@@ -8,6 +8,7 @@ import (
 	"meta"
 	"log"
 	"os"
+	"bytes"
 )
 
 var c *conf.Conf
@@ -76,34 +77,52 @@ func doExport() {
 		log.Fatalf("error: %v", err)
 	}
 	defer rows.Close()
-	var tables []TableMeta
+	var tables []meta.TableMeta
 	for rows.Next() {
 		var table_name string
 		rows.Scan(&table_name)
 		fmt.Printf("table=%v\n", table_name)
-		var tbl meta.TableMeta
+		tbl := meta.NewTableMeta(table_name)
 		tbl.TableName = table_name
-		stmt, err := conn.Prepare(SELECT_TABLE_META)
+
+		stmt, err := conn.Prepare(SELECT_PRIMARY_KEY)
 		if err != nil {
 			log.Fatalf("error: %v", err);
 		}
 		defer stmt.Close()
+
 		row, err := stmt.Query(table_name)
+		if err != nil {
+			log.Fatalf("error: %v", err);
+		}
+		var pk string
+		for row.Next() {
+			row.Scan(&pk)
+			break
+		}
+
+		st2, err := conn.Prepare(SELECT_TABLE_META)
+		if err != nil {
+			log.Fatalf("error: %v", err);
+		}
+		defer st2.Close()
+		rw2, err := st2.Query(table_name)
 		if err != nil {
 			log.Fatalf("error: %v", err);
 		}
 		var n string
 		var t string
 		var m string
-		for row.Next() {
-			row.Scan(&n, &t, &m)
+		for rw2.Next() {
+			rw2.Scan(&n, &t, &m)
 			fmt.Printf("column=%v, type=%v, mode=%v\n", n, t, mode_dic[m])
-			var cm meta.ColumnMeta
-			cm.Name = n
-			cm.Type = t
-			cm.Mode = mode_dic[m]
+			cm := meta.NewColumnMeta(n, t, m, pk)
+			tbl.Columns = append(tbl.Columns, cm)
 		}
 		tables = append(tables, tbl)
+		var buf bytes.Buffer
+		tbl.Export(&buf)
+		fmt.Println(buf.String())
 	}
 }
 
