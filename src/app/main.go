@@ -71,6 +71,21 @@ func doExport() {
 		log.Fatalf("error: %v", err)
 	}
 	defer conn.Close()
+	conn.SetMaxOpenConns(10)
+
+	rows, err := conn.Query(SELECT_TABLE_NAMES)
+	if err != nil {
+		log.Fatalf("error: %v", err)
+	}
+	defer rows.Close()
+	var tables []meta.TableMeta
+	var table_name string
+	for rows.Next() {
+		rows.Scan(&table_name)
+		//		fmt.Printf("table=%v\n", table_name)
+		tbl := meta.NewTableMeta(table_name)
+		tables = append(tables, tbl)
+	}
 
 	stmt, err := conn.Prepare(SELECT_PRIMARY_KEY)
 	if err != nil {
@@ -84,21 +99,9 @@ func doExport() {
 	}
 	defer st2.Close()
 
-	rows, err := conn.Query(SELECT_TABLE_NAMES)
-	if err != nil {
-		log.Fatalf("error: %v", err)
-	}
-	defer rows.Close()
-	var tables []meta.TableMeta
+	for _, tb := range tables {
 
-	for rows.Next() {
-		var table_name string
-		rows.Scan(&table_name)
-//		fmt.Printf("table=%v\n", table_name)
-		tbl := meta.NewTableMeta(table_name)
-		tbl.TableName = table_name
-
-		row, err := stmt.Query(table_name)
+		row, err := stmt.Query(tb.TableName)
 		if err != nil {
 			log.Fatalf("error: %v", err);
 		}
@@ -110,7 +113,7 @@ func doExport() {
 			break
 		}
 
-		rw2, err := st2.Query(table_name)
+		rw2, err := st2.Query(tb.TableName)
 		if err != nil {
 			log.Fatalf("error: %v", err);
 		}
@@ -121,13 +124,11 @@ func doExport() {
 		var m string
 		for rw2.Next() {
 			rw2.Scan(&n, &t, &m)
-//			fmt.Printf("column=%v, type=%v, mode=%v\n", n, t, mode_dic[m])
 			cm := meta.NewColumnMeta(n, t, m, pk)
-			tbl.Columns = append(tbl.Columns, cm)
+			tb.Columns = append(tb.Columns, cm)
 		}
-		tables = append(tables, tbl)
 		var buf bytes.Buffer
-		tbl.Export(&buf)
+		tb.Export(&buf)
 		fmt.Println(buf.String())
 	}
 }
