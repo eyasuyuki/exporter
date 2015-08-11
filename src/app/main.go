@@ -77,7 +77,6 @@ func doExport() {
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
-	defer rows.Close()
 	var tables []meta.TableMeta
 	var table_name string
 	for rows.Next() {
@@ -86,6 +85,7 @@ func doExport() {
 		tbl := meta.NewTableMeta(table_name)
 		tables = append(tables, tbl)
 	}
+	rows.Close()
 
 	stmt, err := conn.Prepare(SELECT_PRIMARY_KEY)
 	if err != nil {
@@ -105,19 +105,17 @@ func doExport() {
 		if err != nil {
 			log.Fatalf("error: %v", err);
 		}
-		defer row.Close()
-
 		var pk string
 		for row.Next() {
 			row.Scan(&pk)
 			break
 		}
+		row.Close()
 
 		rw2, err := st2.Query(tb.TableName)
 		if err != nil {
 			log.Fatalf("error: %v", err);
 		}
-		defer rw2.Close()
 
 		var n string
 		var t string
@@ -127,6 +125,8 @@ func doExport() {
 			cm := meta.NewColumnMeta(n, t, m, pk)
 			tb.Columns = append(tb.Columns, cm)
 		}
+		rw2.Close()
+
 		var buf bytes.Buffer
 		tb.Export(&buf)
 		fmt.Println(buf.String())
