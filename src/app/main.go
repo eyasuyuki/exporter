@@ -61,10 +61,10 @@ func init() {
 }
 
 func doExport() {
-	fmt.Printf("%v:%v, %v\n", c.Host, c.Port, c.Database)
+//	fmt.Printf("%v:%v, %v\n", c.Host, c.Port, c.Database)
 
 	var spec = "user=postgres host="+c.Host+" port="+c.Port+" dbname="+c.Database+" sslmode=disable"
-	fmt.Println(spec)
+//	fmt.Println(spec)
 
 	conn, err := sql.Open("postgres", spec)
 	if err != nil {
@@ -72,24 +72,31 @@ func doExport() {
 	}
 	defer conn.Close()
 
+	stmt, err := conn.Prepare(SELECT_PRIMARY_KEY)
+	if err != nil {
+		log.Fatalf("error: %v", err);
+	}
+	defer stmt.Close()
+
+	st2, err := conn.Prepare(SELECT_TABLE_META)
+	if err != nil {
+		log.Fatalf("error: %v", err);
+	}
+	defer st2.Close()
+
 	rows, err := conn.Query(SELECT_TABLE_NAMES)
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
 	defer rows.Close()
 	var tables []meta.TableMeta
+
 	for rows.Next() {
 		var table_name string
 		rows.Scan(&table_name)
-		fmt.Printf("table=%v\n", table_name)
+//		fmt.Printf("table=%v\n", table_name)
 		tbl := meta.NewTableMeta(table_name)
 		tbl.TableName = table_name
-
-		stmt, err := conn.Prepare(SELECT_PRIMARY_KEY)
-		if err != nil {
-			log.Fatalf("error: %v", err);
-		}
-		defer stmt.Close()
 
 		row, err := stmt.Query(table_name)
 		if err != nil {
@@ -101,11 +108,6 @@ func doExport() {
 			break
 		}
 
-		st2, err := conn.Prepare(SELECT_TABLE_META)
-		if err != nil {
-			log.Fatalf("error: %v", err);
-		}
-		defer st2.Close()
 		rw2, err := st2.Query(table_name)
 		if err != nil {
 			log.Fatalf("error: %v", err);
@@ -115,7 +117,7 @@ func doExport() {
 		var m string
 		for rw2.Next() {
 			rw2.Scan(&n, &t, &m)
-			fmt.Printf("column=%v, type=%v, mode=%v\n", n, t, mode_dic[m])
+//			fmt.Printf("column=%v, type=%v, mode=%v\n", n, t, mode_dic[m])
 			cm := meta.NewColumnMeta(n, t, m, pk)
 			tbl.Columns = append(tbl.Columns, cm)
 		}
