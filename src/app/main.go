@@ -59,6 +59,15 @@ func init() {
 	mode_dic["true"] = "REQUIRED"
 }
 
+const HEADER = `
+package data
+
+import (
+	"time"
+)
+
+`
+
 func doExport() {
 	fmt.Printf("%v:%v, %v\n", c.Host, c.Port, c.Database)
 
@@ -76,6 +85,9 @@ func doExport() {
 		log.Fatalf("error: %v", err)
 	}
 	defer rows.Close()
+
+	fmt.Println(HEADER)
+	
 	var tables []TableMeta
 	for rows.Next() {
 		var table_name string
