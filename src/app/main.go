@@ -8,6 +8,7 @@ import (
 	"meta"
 	"log"
 	"os"
+	"bytes"
 )
 
 var c *conf.Conf
@@ -69,16 +70,17 @@ import (
 `
 
 func doExport() {
-	fmt.Printf("%v:%v, %v\n", c.Host, c.Port, c.Database)
+//	fmt.Printf("%v:%v, %v\n", c.Host, c.Port, c.Database)
 
 	var spec = "user=postgres host="+c.Host+" port="+c.Port+" dbname="+c.Database+" sslmode=disable"
-	fmt.Println(spec)
+//	fmt.Println(spec)
 
 	conn, err := sql.Open("postgres", spec)
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
 	defer conn.Close()
+	conn.SetMaxOpenConns(10)
 
 	rows, err := conn.Query(SELECT_TABLE_NAMES)
 	if err != nil {
@@ -88,34 +90,59 @@ func doExport() {
 
 	fmt.Println(HEADER)
 	
-	var tables []TableMeta
+	var tables []meta.TableMeta
+	var table_name string
 	for rows.Next() {
-		var table_name string
 		rows.Scan(&table_name)
-		fmt.Printf("table=%v\n", table_name)
-		var tbl meta.TableMeta
-		tbl.TableName = table_name
-		stmt, err := conn.Prepare(SELECT_TABLE_META)
+		//		fmt.Printf("table=%v\n", table_name)
+		tbl := meta.NewTableMeta(table_name)
+		tables = append(tables, tbl)
+	}
+	rows.Close()
+
+	stmt, err := conn.Prepare(SELECT_PRIMARY_KEY)
+	if err != nil {
+		log.Fatalf("error: %v", err);
+	}
+	defer stmt.Close()
+
+	st2, err := conn.Prepare(SELECT_TABLE_META)
+	if err != nil {
+		log.Fatalf("error: %v", err);
+	}
+	defer st2.Close()
+
+	for _, tb := range tables {
+
+		row, err := stmt.Query(tb.TableName)
 		if err != nil {
 			log.Fatalf("error: %v", err);
 		}
-		defer stmt.Close()
-		row, err := stmt.Query(table_name)
+		var pk string
+		for row.Next() {
+			row.Scan(&pk)
+			break
+		}
+		row.Close()
+
+		rw2, err := st2.Query(tb.TableName)
 		if err != nil {
 			log.Fatalf("error: %v", err);
 		}
+
 		var n string
 		var t string
 		var m string
-		for row.Next() {
-			row.Scan(&n, &t, &m)
-			fmt.Printf("column=%v, type=%v, mode=%v\n", n, t, mode_dic[m])
-			var cm meta.ColumnMeta
-			cm.Name = n
-			cm.Type = t
-			cm.Mode = mode_dic[m]
+		for rw2.Next() {
+			rw2.Scan(&n, &t, &m)
+			cm := meta.NewColumnMeta(n, t, m, pk)
+			tb.Columns = append(tb.Columns, cm)
 		}
-		tables = append(tables, tbl)
+		rw2.Close()
+
+		var buf bytes.Buffer
+		tb.Export(&buf)
+		fmt.Println(buf.String())
 	}
 }
 
