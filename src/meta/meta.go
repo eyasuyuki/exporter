@@ -20,6 +20,7 @@ func init() {
 	TYPE_DIC = map[string]string{
 		"int":"int64",
 		"int4":"int64",
+		"bigint":"int64",
 		"number":"float64",
 		"timestamp":"time.Time",
 		"timestamptz":"time.Time",
