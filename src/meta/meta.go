@@ -69,10 +69,11 @@ func NewColumnMeta(name, typ, mode, pk string) ColumnMeta {
 	cm.Mode = MODE_DIC[mode]
 	if cm.Mode == "NULLABLE" {
 		cm.GoType = "*"+TYPE_DIC[typ]
+		cm.Tags = "`json:\""+name+",omitempty\"	column:\""+name+"\""
 	} else {
 		cm.GoType = TYPE_DIC[typ]
+		cm.Tags = "`json:\""+name+"\"	column:\""+name+"\""
 	}
-	cm.Tags = cm.Tags+"`json:\""+name+"\"	column:\""+name+"\""
 	if cm.Primary {
 		cm.Tags = cm.Tags+"	db:\"pk\""
 	}
